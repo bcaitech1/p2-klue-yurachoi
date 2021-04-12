@@ -7,6 +7,9 @@ import pickle as pickle
 import numpy as np
 import argparse
 
+# import argparse
+from importlib import import_module
+
 def inference(model, tokenized_sent, device):
   dataloader = DataLoader(tokenized_sent, batch_size=40, shuffle=False)
   model.eval()
@@ -40,12 +43,14 @@ def main(args):
   """
   device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
   # load tokenizer
-  TOK_NAME = "bert-base-multilingual-cased"  
+#   TOK_NAME = "bert-base-multilingual-cased" 
+  TOK_NAME = args.pretrained_model
   tokenizer = AutoTokenizer.from_pretrained(TOK_NAME)
 
+
   # load my model
-  MODEL_NAME = args.model_dir # model dir.
-  model = BertForSequenceClassification.from_pretrained(args.model_dir)
+  model_module = getattr(import_module("transformers"), args.model_type + "ForSequenceClassification")
+  model = model_module.from_pretrained(args.model_dir)
   model.parameters
   model.to(device)
 
@@ -60,13 +65,18 @@ def main(args):
   # 아래 directory와 columns의 형태는 지켜주시기 바랍니다.
 
   output = pd.DataFrame(pred_answer, columns=['pred'])
-  output.to_csv('./prediction/submission.csv', index=False)
+#   output.to_csv('./prediction/submission.csv', index=False)
+  if os.path.
+  output.to_csv(args.out_path, index=False)
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   
   # model dir
-  parser.add_argument('--model_dir', type=str, default="./results/checkpoint-500")
+  parser.add_argument('--model_dir', type=str, default="./results/expr/checkpoint-2000")
+  parser.add_argument('--out_path', type=str, default="./prediction/submission.csv")
+  parser.add_argument('--model_type', type=str, default="Bert")
+  parser.add_argument('--pretrained_model', type=str, default="bert-base-multilingual-cased")
   args = parser.parse_args()
   print(args)
   main(args)
