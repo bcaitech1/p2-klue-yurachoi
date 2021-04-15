@@ -1,0 +1,8 @@
+.netrc
+.DS_Store
+.*
+
+!/.gitignore
+!code/
+!input/
+
