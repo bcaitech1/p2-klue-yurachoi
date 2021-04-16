@@ -10,6 +10,7 @@ import argparse
 from importlib import import_module
 from pathlib import Path
 import glob
+import re
 
 
 # 평가를 위한 metrics function.
@@ -34,8 +35,6 @@ def increment_output_dir(output_path, exist_ok=False):
     return f"{path}{n}"
 
 
-
-
 def train(args):
   # load model and tokenizer
   MODEL_NAME = args.pretrained_model
@@ -55,14 +54,14 @@ def train(args):
   RE_train_dataset = RE_Dataset(tokenized_train, train_label)
   #RE_dev_dataset = RE_Dataset(tokenized_dev, dev_label)
 
-  device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+  device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
   # setting model hyperparameter
   config_module = getattr(import_module("transformers"), args.model_type + "Config")
   model_config = config_module.from_pretrained(MODEL_NAME)
   model_config.num_labels = 42
   model_module = getattr(import_module("transformers"), args.model_type + "ForSequenceClassification")
-  model = model_module(model_config)
+  model = model_module.from_pretrained(MODEL_NAME, config=model_config)
   model.parameters
   model.to(device)
 
