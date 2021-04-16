@@ -1,6 +1,7 @@
 import pickle as pickle
 import os
 import pandas as pd
+import random
 import torch
 from sklearn.metrics import accuracy_score
 from transformers import AutoTokenizer, BertForSequenceClassification, Trainer, TrainingArguments, BertConfig
@@ -12,6 +13,8 @@ from pathlib import Path
 import glob
 import re
 
+import wandb
+
 
 # 평가를 위한 metrics function.
 def compute_metrics(pred):
@@ -22,6 +25,7 @@ def compute_metrics(pred):
   return {
       'accuracy': acc,
   }
+
 
 def increment_output_dir(output_path, exist_ok=False):
   path = Path(output_path)
@@ -81,12 +85,14 @@ def train(args):
     weight_decay=0.01,               # strength of weight decay
     logging_dir='./logs',            # directory for storing logs
     logging_steps=100,              # log saving step.
+    report_to='wandb',
     #evaluation_strategy='steps', # evaluation strategy to adopt during training
                                 # `no`: No evaluation during training.
                                 # `steps`: Evaluate every `eval_steps`.
                                 # `epoch`: Evaluate every end of epoch.
     #eval_steps = 500,            # evaluation step.
   )
+  
   trainer = Trainer(
     model=model,                         # the instantiated 🤗 Transformers model to be trained
     args=training_args,                  # training arguments, defined above
@@ -97,6 +103,9 @@ def train(args):
 
   # train model
   trainer.train()
+  # 학습이 끝나면 wandb 프로세스도 종료시킴
+  wandb.finish()
+
 
 def main(args):
   train(args)
