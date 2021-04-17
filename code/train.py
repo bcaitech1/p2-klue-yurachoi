@@ -6,6 +6,7 @@ import torch
 from sklearn.metrics import accuracy_score
 from transformers import AutoTokenizer, BertForSequenceClassification, Trainer, TrainingArguments, BertConfig
 from load_data import *
+from dataset import *
 
 import argparse
 from importlib import import_module
@@ -13,7 +14,7 @@ from pathlib import Path
 import glob
 import re
 
-import wandb
+# import wandb
 
 
 # 평가를 위한 metrics function.
@@ -45,18 +46,23 @@ def train(args):
   tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
   # load dataset
-  train_dataset = load_data("/opt/ml/input/data/train/train.tsv")
+  train_dataset = load_pd_data("/opt/ml/input/data/train/train.tsv")
+  # train_dataset = load_data("/opt/ml/input/data/train/train.tsv")
+
+
   #dev_dataset = load_data("./dataset/train/dev.tsv")
   train_label = train_dataset['label'].values
   #dev_label = dev_dataset['label'].values
   
   # tokenizing dataset
-  tokenized_train = tokenized_dataset(train_dataset, tokenizer)
-  #tokenized_dev = tokenized_dataset(dev_dataset, tokenizer)
+  # tokenized_train = tokenized_dataset(train_dataset, tokenizer)
+  tokenized_train, ent1_locs, ent2_locs = tokenize_rel_dataset(train_dataset, tokenizer)
+
 
   # make dataset for pytorch.
-  RE_train_dataset = RE_Dataset(tokenized_train, train_label)
-  #RE_dev_dataset = RE_Dataset(tokenized_dev, dev_label)
+  # RE_train_dataset = RE_Dataset(tokenized_train, train_label)
+  train_dataset = RelationDataset(tokenized_train, ent1_locs, ent2_locs, train_label)
+
 
   device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -64,7 +70,8 @@ def train(args):
   config_module = getattr(import_module("transformers"), args.model_type + "Config")
   model_config = config_module.from_pretrained(MODEL_NAME)
   model_config.num_labels = 42
-  model_module = getattr(import_module("transformers"), args.model_type + "ForSequenceClassification")
+  # model_module = getattr(import_module("transformers"), args.model_type + "ForSequenceClassification")
+  model_module = getattr(import_module("models"), "ElectraForSemanticAnalysis")
   model = model_module.from_pretrained(MODEL_NAME, config=model_config)
   model.parameters
   model.to(device)
@@ -85,7 +92,7 @@ def train(args):
     weight_decay=0.01,               # strength of weight decay
     logging_dir='./logs',            # directory for storing logs
     logging_steps=100,              # log saving step.
-    report_to='wandb',
+    # report_to='wandb',
     #evaluation_strategy='steps', # evaluation strategy to adopt during training
                                 # `no`: No evaluation during training.
                                 # `steps`: Evaluate every `eval_steps`.
@@ -96,7 +103,7 @@ def train(args):
   trainer = Trainer(
     model=model,                         # the instantiated 🤗 Transformers model to be trained
     args=training_args,                  # training arguments, defined above
-    train_dataset=RE_train_dataset,         # training dataset
+    train_dataset=train_dataset,         # training dataset
     #eval_dataset=RE_dev_dataset,             # evaluation dataset
     #compute_metrics=compute_metrics         # define metrics function
   )

@@ -27,11 +27,11 @@ class ElectraRelationClassificationHead(nn.Module):
     def forward(self, features, loc1, loc2, **kwargs):
         x1 = features[range(len(loc1)), loc1, :] # (batch_size, hidden_state_dim)
         x2 = features[range(len(loc2)), loc2, :] # (batch_size, hidden_state_dim)
-        x_total = torch.cat(x1, x2, dim=1) # (batch_size, hidden_state_dim * 2)
+        x_total = torch.cat([x1, x2], dim=1) # (batch_size, hidden_state_dim * 2)
 
         x = self.dropout(x_total)
         x = self.dense(x)
-        x = get_activation("gelu")(x)
+        x = torch.nn.functional.gelu(x)
         x = self.dropout(x)
         x = self.out_proj(x)
 
@@ -57,11 +57,13 @@ class ElectraForSemanticAnalysis(ElectraPreTrainedModel):
                 position_ids=None, 
                 head_mask=None, 
                 inputs_embeds=None, 
-                labels=None, 
                 output_attentions=None, 
                 output_hidden_states=None, 
                 return_dict=None,
-                entity_ids=None):
+                entity1_ids=None, # 내가 추가한 인자
+                entity2_ids=None, # 내가 추가한 인자
+                labels=None
+                ):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         outputs = self.model(
@@ -76,16 +78,9 @@ class ElectraForSemanticAnalysis(ElectraPreTrainedModel):
             return_dict=return_dict,
         )
 
-        print(outputs.shape)
         sequence_output = outputs[0] # last_hidden_states을 가져와줌
 
-        # entity_ids: shape (batch_size, 2) 각 데이터 별로 entity1 토큰
-        if not entity_ids:
-            id1 = id2 = [0 * len(input_ids)]
-        else:
-            id1, id2 = entity_ids[:, 0], entity_ids[:, 1]
-
-        logits = self.classifier(sequence_output, id1, id2)
+        logits = self.classifier(sequence_output, entity1_ids, entity2_ids)
         
         loss = None
         if labels is not None:
@@ -95,22 +90,22 @@ class ElectraForSemanticAnalysis(ElectraPreTrainedModel):
             else:
                 loss_fct = nn.CrossEntropyLoss()
                 loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
-            
-        if not return_dict:
-            output = (logits,) + discriminator_hidden_states[1:]
-            return ((loss, ) + output) if loss is not None else output
 
-        return SequenceClassifierOutput(
-            loss = loss,
-            logits = logits, 
-            hidden_states=discriminator_hidden_states.hidden_states,
-            attentions=discriminator_hidden_states.attentions
-        )
+        if not return_dict:
+            output = (logits,) + outputs[1:]
+            return ((loss,) + output) if loss is not None else output
+
+        return {
+            'loss': loss,
+            'logits': logits,
+            'hidden_states': outputs.hidden_states,
+            'attentions': outputs.attentions,
+        }
 
 
 
 if __name__ =="__main__":
     config = transformers.ElectraConfig.from_pretrained("monologg/koelectra-base-v3-discriminator")
-    config.num_classes = 42
+    config.num_labels = 42
     model = ElectraForSemanticAnalysis.from_pretrained("monologg/koelectra-base-v3-discriminator", config=config)
     print("ElectraForSemanticAnalysis model is working well")
