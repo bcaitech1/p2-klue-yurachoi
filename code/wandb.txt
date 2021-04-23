@@ -1,0 +1,9 @@
+# DST 예비조원님들과 시간 중 아라님께서 알려주신 wandb 사용
+
+# wandb.init()
+# wandb.run.name = f'{args.model_name}'
+# wandb.config.update(args)
+
+# wandb.log({
+#             "Valid Loss": val_total_loss,
+#             "Valid Acc": val_total_acc})
